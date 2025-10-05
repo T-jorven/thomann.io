@@ -11,6 +11,7 @@ test.describe(' Cable Page flow', () => {
     await cablePage.open();
     await cablePage.selectCableBeginning();
     await cablePage.selectCableEnd();
-  
+    await cablePage.getRandomBrand();
+    console.log('got here');
   });
 });
