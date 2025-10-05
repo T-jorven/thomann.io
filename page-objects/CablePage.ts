@@ -13,14 +13,13 @@ export class CablePage {
   readonly displayedProducts: Locator;
   readonly cableItems: Locator;
 
-  private lastBrands: { brand: string; count: number }[] = [];
   private articlesCount = 0;
   private plugMsgs: string[] = [];
   private randomBrand: string[] = [];
 
   constructor(page: Page) {
     this.page = page;
-    this.acceptCookiesBtn = page.locator('.spicy-consent-bar__action-accept'); // locale-proof
+    this.acceptCookiesBtn = page.locator('.spicy-consent-bar__action-accept');
     this.cableBeginningBtn = page.locator('.cg-plugButton--left');
     this.cableEndBtn = page.locator('.cg-plugButton--right');
     this.searchFld = page.locator('input.cg-plugmodal__search__input');
@@ -32,61 +31,41 @@ export class CablePage {
     this.cableItems = this.page.locator('.cg-plugItem__subheadline');
   }
 
-  // Card in the modal identified by image token (e.g., "bnc_female")
-  private modalCardByToken(token: string) {
-    return this.page.locator(`.cg-plugItem:has(img.cg-plugImage[src*="${token}"])`);
-  }
-
   async open() {
     const resp = await this.page.goto(this.baseURL, { waitUntil: 'domcontentloaded' });
-
     expect(resp?.ok()).toBeTruthy();
     await expect(this.page).toHaveURL(/cableguy\.html/);
+    //accept cookies
     await this.acceptCookiesBtn.click({ timeout: 1500 }).catch(() => {});
   }
 
   async selectCableBeginning() {
     await this.cableBeginningBtn.click();
-    // open picker
-    //search for the needed type
 
     //get all plugs
-    // 1) Get all items’ texts
-    //const items = this.page.locator('.cg-plugItem__subheadline');
     const plugNames = (await this.cableItems.allTextContents())
       .map((t) => t.replace(/\s+/g, ' ').trim())
       .filter(Boolean);
 
-    // 2) Count, pick random index, get that item’s text
+    // Count, pick random index, get that item’s text
     const total = plugNames.length;
     if (total === 0) throw new Error('No plug items found');
-
     const idx = Math.floor(Math.random() * total);
     const name = plugNames[idx];
-
-    //console.log({ total, idx, name });
-
-    // 3) (optional) act on the same DOM item
-    // use the locator index to click/scroll, staying in sync with the chosen text
     await this.cableItems.nth(idx).scrollIntoViewIfNeeded();
-    // before the click
-
     const respWait = this.page.waitForResponse(
       (r) => r.ok() && /(cableguy_ajax\.html|cableguy.*ajax)/i.test(r.url()),
       { timeout: 10000 },
     );
     this.page.waitForTimeout(1500);
-    await this.cableItems.nth(idx).click(); // triggers the request
+    await this.cableItems.nth(idx).click();
+
     // parse response and collect all msg values
     const resp = await respWait;
     const data = await resp.json().catch(async () => JSON.parse(await resp.text()));
     this.plugMsgs = (data?.plugs?.plugs ?? [])
       .map((p: any) => String(p?.msg ?? '').trim())
       .filter(Boolean);
-
-    // optional: return them
-    // console.log('Plugs End: ' + this.plugMsgs);
-    return this.plugMsgs;
   }
 
   async selectCableEnd() {
@@ -99,7 +78,7 @@ export class CablePage {
     await this.cableEndBtn.click();
     await this.cableItems.nth(endIdx).scrollIntoViewIfNeeded();
 
-    // arm response wait and click simultaneously
+    // response wait and click simultaneously
     const [resp] = await Promise.all([
       this.page.waitForResponse(
         (r) =>
@@ -116,61 +95,19 @@ export class CablePage {
     const brands = (data?.brands ?? [])
       .map((b: any) => String(b?.brand ?? '').trim())
       .filter(Boolean);
-
     const totalBrands = brands.length;
     if (!totalBrands) throw new Error('No brands found in response');
-
     const brandIdx = Math.floor(Math.random() * totalBrands);
     const chosenBrand = brands[brandIdx];
-
-    // store if you want to reuse later
     this.randomBrand = chosenBrand;
-    this.articlesCount = totalBrands;
-    console.log({ totalEnds, endIdx, totalBrands, brandIdx, chosenBrand });
-    return chosenBrand;
-  }
-
-  // Call this right around the click that triggers the update
-  async getBrandsFromUpdate() {
-    const resp = await this.page.waitForResponse(
-      (r) => r.ok() && /cableguy.*ajax|cableguy_ajax\.html/i.test(r.url()), // adjust if needed
+    const totalItemsCount = Number(
+      (data?.brands ?? []).find(
+        (b) => String(b?.brand).trim().toLowerCase() === chosenBrand.toLowerCase(),
+      )?.count ?? 0,
     );
 
-    //get cable names:
-    const html = await resp.text();
-    const m = html.match(/"cableData"\s*:\s*(\[[\s\S]*?\])/);
-    if (!m) throw new Error('cableData not found in response');
-
-    const cableData = JSON.parse(m[1]);
-    const cableNames = cableData.map((c) => c.name);
-    console.log(cableData, cableNames);
-    // Prefer JSON; fallback to text→JSON if server mislabels content-type
-    let data: any;
-    try {
-      data = await resp.json();
-    } catch {
-      const txt = await resp.text();
-      data = JSON.parse(txt); // body is JSON even if URL says .html
-    }
-    const side = data?.plugs?.side;
-    const brands = (data?.brands ?? []).map((b: any) => b.brand);
-    const brandPairs = (data?.brands ?? []).map((b: any) => ({
-      brand: b.brand,
-      count: String(b.count),
-    }));
-
-    const count = Number(
-      data?.data?.result?.articles?.count ?? data?.data?.result?.articles?.items?.length ?? 0,
-    );
-
-    this.articlesCount = count;
-
-    //const filterProductsReturned = data?.data?.result?.articles?.count;
-    //count of returned
-    //console.log('count of returned: ' + filterProductsReturned);
-    this.lastBrands = brands;
-    console.log('side: ' + side + '; ' + 'Brands:', brands);
-    return { count, brands, brandPairs, raw: data };
+    console.log('total count ' + totalItemsCount);
+    this.articlesCount = totalItemsCount;
   }
 
   async getRandomBrand() {
@@ -179,8 +116,7 @@ export class CablePage {
     });
     console.log(this.randomBrand);
     await item.click();
-  
-    console.log('from the class: ' + this.articlesCount); // value saved on the class instance
+
     //get count
 
     const productCount = parseInt(
@@ -191,7 +127,6 @@ export class CablePage {
         .innerText(),
       10,
     );
-
     console.log('number of products:' + productCount);
 
     //assert the number of elements displayed:
