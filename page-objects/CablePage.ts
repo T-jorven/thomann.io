@@ -50,7 +50,7 @@ export class CablePage {
     // Count, pick random index, get that item’s text
     const total = plugNames.length;
     if (total === 0) throw new Error('No plug items found');
-    const idx = Math.floor(Math.random() * total);
+    const idx = this.getRandomNumber(total);
     const name = plugNames[idx];
     await this.cableItems.nth(idx).scrollIntoViewIfNeeded();
     const respWait = this.page.waitForResponse(
@@ -72,11 +72,10 @@ export class CablePage {
     // pick random end from the list you already built
     const totalEnds = this.plugMsgs.length;
     if (!totalEnds) throw new Error('No plug messages found');
-    const endIdx = Math.floor(Math.random() * totalEnds);
+    const endIdx = this.getRandomNumber(totalEnds);
 
     // open end picker
     await this.cableEndBtn.click();
-    await this.cableItems.nth(endIdx).scrollIntoViewIfNeeded();
 
     // response wait and click simultaneously
     const [resp] = await Promise.all([
@@ -96,8 +95,9 @@ export class CablePage {
       .map((b: any) => String(b?.brand ?? '').trim())
       .filter(Boolean);
     const totalBrands = brands.length;
-    if (!totalBrands) throw new Error('No brands found in response');
-    const brandIdx = Math.floor(Math.random() * totalBrands);
+    console.log('total brands from JSON: ' + totalBrands);
+    if (!totalBrands) throw new Error('No manufacturers found in response');
+    const brandIdx = this.getRandomNumber(totalBrands);
     const chosenBrand = brands[brandIdx];
     this.randomBrand = chosenBrand;
     const totalItemsCount = Number(
@@ -106,7 +106,7 @@ export class CablePage {
       )?.count ?? 0,
     );
 
-    console.log('total count ' + totalItemsCount);
+    console.log('total items count for a selected manufacturer: ' + totalItemsCount);
     this.articlesCount = totalItemsCount;
   }
 
@@ -114,7 +114,7 @@ export class CablePage {
     const item = this.page.locator('.cg-brands__item', {
       has: this.page.locator(`img[alt*="${this.randomBrand}" i]`),
     });
-    console.log(this.randomBrand);
+    console.log('Slected random manufacturer: ' + this.randomBrand);
     await item.click();
 
     //get count
@@ -127,11 +127,15 @@ export class CablePage {
         .innerText(),
       10,
     );
-    console.log('number of products:' + productCount);
+    console.log('Number of products displayed: ' + productCount);
 
     //assert the number of elements displayed:
     // will be asserted through the received html, instead of UI because UI returns all shadow elements instead of the only ones displayed.
 
     expect(productCount).toBe(this.articlesCount);
+  }
+
+  getRandomNumber(maxExclusive: number): number {
+    return Math.floor(Math.random() * Math.floor(maxExclusive));
   }
 }
